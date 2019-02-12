@@ -5,6 +5,8 @@ import face_recognition as fr
 import matplotlib.pyplot as plt
 import numpy as np
 
+from utils import CodeTimer
+
 
 def display_image(img, cmap=None):
     rgb_image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -137,9 +139,12 @@ def main():
     bad = cv2.imread('dataset/public_face/bad/0_eac098e1-f0fd-4c13-9dba-c9d4d8493f35.jpg')
 
     good_score = symmetry(hog, good, win_size, is_show=True)
-    bad_socre = symmetry(hog, bad, win_size, is_show=True)
+    bad_score = symmetry(hog, bad, win_size, is_show=True)
 
-    print("Test Result: G: {:.2f}, B: {:.2f}".format(good_score, bad_socre))
+    with CodeTimer("single good face"):
+        symmetry(hog, good, win_size)
+
+    print("Test Result: G: {:.2f}, B: {:.2f}".format(good_score, bad_score))
 
     thr = 0.5
     image_names = glob.glob("dataset/public_face/good/*.jpg")
