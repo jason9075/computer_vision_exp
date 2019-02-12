@@ -7,9 +7,40 @@ import numpy as np
 
 
 def display_image(img, cmap=None):
-    plt.figure()
     rgb_image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     plt.imshow(rgb_image, cmap=cmap)
+
+
+def display_compare(origin, left, right):
+    plt.figure()
+    plt.subplot(1, 3, 1)
+    display_image(origin)
+
+    plt.subplot(1, 3, 2)
+    display_image(left)
+
+    plt.subplot(1, 3, 3)
+    display_image(right)
+
+
+def display_sobel(origin, left, right):
+    mag_origin = sobel(origin)
+    mag_left = sobel(left)
+    mag_right = sobel(right)
+
+    display_compare(mag_origin, mag_left, mag_right)
+
+
+def sobel(image):
+    # normalize [0:255] to [0:1]
+    img = np.float32(image) / 255.0
+
+    # Calculate gradient
+    gx = cv2.Sobel(img, cv2.CV_32F, 1, 0, ksize=1)
+    gy = cv2.Sobel(img, cv2.CV_32F, 0, 1, ksize=1)
+    mag, _ = cv2.cartToPolar(gx, gy, angleInDegrees=True)
+
+    return mag
 
 
 def crop_image(img, center, size):
@@ -25,6 +56,7 @@ def symmetry(hog, image, crop_size, is_show=False):
     landmarks = fr.api.face_landmarks(image, [(0, w, h, 0)])[0]
     image, matrix = align(image, landmarks)
 
+    # https://i.stack.imgur.com/05uIT.jpg
     left_part = np.dot(matrix, landmarks['nose_tip'][0] + (1,)).astype(int)
     right_part = np.dot(matrix, landmarks['nose_tip'][4] + (1,)).astype(int)
 
@@ -33,14 +65,14 @@ def symmetry(hog, image, crop_size, is_show=False):
     hist_left_eyes = hog.compute(croped_left)
     hist_right_eyes = hog.compute(croped_right)
 
-    eye_score = cv2.compareHist(hist_left_eyes, hist_right_eyes, cv2.HISTCMP_CORREL)
+    score = cv2.compareHist(hist_left_eyes, hist_right_eyes, cv2.HISTCMP_CORREL)
 
     if is_show:
-        display_image(croped_left)
-        display_image(croped_right)
+        display_compare(image, croped_left, croped_right)
+        display_sobel(image, croped_left, croped_right)
         plt.show()
 
-    return eye_score
+    return score
 
 
 def align(image, landmarks):
@@ -97,14 +129,14 @@ def align(image, landmarks):
 
 
 def main():
-    win_size = (16, 16)
+    win_size = (32, 32)
     nbins = 9
     hog = cv2.HOGDescriptor(win_size, win_size, win_size, win_size, nbins)
 
-    good = cv2.imread('dataset/public_face/good/1_9fe8b042-8507-4f56-bd31-c0992251e7e4.jpg')
+    good = cv2.imread('dataset/public_face/good/1_178de7bb-4ed8-4c61-ad36-1d6b3dfb8e37.jpg')
     bad = cv2.imread('dataset/public_face/bad/0_eac098e1-f0fd-4c13-9dba-c9d4d8493f35.jpg')
 
-    good_score = symmetry(hog, good, win_size, is_show=False)
+    good_score = symmetry(hog, good, win_size, is_show=True)
     bad_socre = symmetry(hog, bad, win_size, is_show=True)
 
     print("Test Result: G: {:.2f}, B: {:.2f}".format(good_score, bad_socre))
