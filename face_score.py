@@ -4,7 +4,6 @@ import cv2
 import face_recognition as fr
 import matplotlib.pyplot as plt
 import numpy as np
-import copy
 
 
 def display_image(img, cmap=None):
@@ -17,28 +16,28 @@ def crop_image(img, center, size):
     width, height = int(size[0] / 2), int(size[1] / 2)
     c_x = center[0]
     c_y = center[1]
-    return img[c_y - height:c_y + height - 1, c_x - width:c_x + width - 1, :]
+    return img[c_y - height:c_y + height, c_x - width:c_x + width, :]
 
 
-def calc_hog(hog, image, crop_size, is_show=False):
+def symmetry(hog, image, crop_size, is_show=False):
     h, w, _ = image.shape
 
     landmarks = fr.api.face_landmarks(image, [(0, w, h, 0)])[0]
     image, matrix = align(image, landmarks)
 
-    p37 = np.dot(matrix, landmarks['left_eye'][0] + (1,)).astype(int)
-    p46 = np.dot(matrix, landmarks['right_eye'][3] + (1,)).astype(int)
+    left_part = np.dot(matrix, landmarks['nose_tip'][0] + (1,)).astype(int)
+    right_part = np.dot(matrix, landmarks['nose_tip'][4] + (1,)).astype(int)
 
-    croped_37 = crop_image(image, p37, crop_size)
-    croped_46 = cv2.flip(crop_image(image, p46, crop_size), 1)  # flip horizontal
-    hist_left_eyes = hog.compute(copy.deepcopy(croped_37))
-    hist_right_eyes = hog.compute(copy.deepcopy(croped_46))
+    croped_left = crop_image(image, left_part, crop_size)
+    croped_right = cv2.flip(crop_image(image, right_part, crop_size), 1)  # flip horizontal
+    hist_left_eyes = hog.compute(croped_left)
+    hist_right_eyes = hog.compute(croped_right)
 
     eye_score = cv2.compareHist(hist_left_eyes, hist_right_eyes, cv2.HISTCMP_CORREL)
 
     if is_show:
-        display_image(croped_37)
-        display_image(croped_46)
+        display_image(croped_left)
+        display_image(croped_right)
         plt.show()
 
     return eye_score
@@ -98,42 +97,40 @@ def align(image, landmarks):
 
 
 def main():
-    win_size = (64, 64)
-    cell_size = (8, 8)
+    win_size = (16, 16)
     nbins = 9
-    hog = cv2.HOGDescriptor(win_size, cell_size, cell_size, cell_size, nbins)
+    hog = cv2.HOGDescriptor(win_size, win_size, win_size, win_size, nbins)
 
-    good = cv2.imread('dataset/public_face/good/1_545ea37c-e55a-4628-9e0b-769aa7bb6750.jpg')
-    bad = cv2.imread('dataset/public_face/bad/0_2f1fdaed-d3be-41e5-992e-70de6d0e366c.jpg')
+    good = cv2.imread('dataset/public_face/good/1_9fe8b042-8507-4f56-bd31-c0992251e7e4.jpg')
+    bad = cv2.imread('dataset/public_face/bad/0_eac098e1-f0fd-4c13-9dba-c9d4d8493f35.jpg')
 
-    good_score = calc_hog(hog, good, win_size, is_show=False)
-    bad_socre = calc_hog(hog, bad, win_size, is_show=False)
+    good_score = symmetry(hog, good, win_size, is_show=False)
+    bad_socre = symmetry(hog, bad, win_size, is_show=True)
 
     print("Test Result: G: {:.2f}, B: {:.2f}".format(good_score, bad_socre))
 
     thr = 0.5
     image_names = glob.glob("dataset/public_face/good/*.jpg")
-
     correct = 0
     for image_name in image_names:
-        print("reading: {}".format(image_name))
         image = cv2.imread(image_name)
-        score = calc_hog(hog, image, win_size)
+        score = symmetry(hog, image, win_size)
         if thr < score:
             correct += 1
-
+        # else:
+        #     print("fail name:{}".format(image_name))
     print("Good face: {}/{} rate:{:.2f}".format(correct, len(image_names), correct / len(image_names)))
 
     image_names = glob.glob("dataset/public_face/bad/*.jpg")
-
     correct = 0
     for image_name in image_names:
         image = cv2.imread(image_name)
-        score = calc_hog(hog, image, win_size)
+        score = symmetry(hog, image, win_size)
         if score < thr:
             correct += 1
-
-    print("bad face: {}/{} rate:{:.2f}".format(correct, len(image_names), correct / len(image_names)))
+        # else:
+        #     print("fail name:{}".format(image_name))
+    print("Bad face: {}/{} rate:{:.2f}".format(correct, len(image_names), correct / len(image_names)))
 
 
 if __name__ == '__main__':
